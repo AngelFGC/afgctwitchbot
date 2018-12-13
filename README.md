@@ -72,4 +72,4 @@ After `<duration>` seconds, the vote ends and the bot announces the results.
 
 ### `!goodbye` : Shut down the bot<sup>§</sup>
 
-*<sup>§</sup>: These ommands are available for mod-level users only*
+*<sup>§</sup>: These commands are available for mod-level users only*
