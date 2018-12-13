@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec  7 11:21:44 2018
-
-@author: AnatoleSerial
+@author: AngelFGC
 """
 
 # https://github.com/joshuaskelly/twitch-observer
@@ -15,29 +13,52 @@ import random
 import operator
 import math
 
-"""
-GLOBALS
-"""
+########################
+# GLOBALS
+########################
+
+# Manages how often msgs are sent to server
 timeout = 0
 
+# Control variables
 running = True
 isMod = False
 
+# Outgoing msg queue, based on timeout
 msg_q = queue.Queue()
 
+# Dice roller RegEx & valid operations
 dice_re = re.compile(r"(\d*)D(\d*)(?:([<>+\/*-])(\d+))?", flags=re.IGNORECASE)
 dice_ops = {"+":operator.add, "/":operator.truediv, 
             "*":operator.mul, "-":operator.sub}
 
+# Voting system globals
 vote_end = -1
 vote_choices = []
 vote_counts = []
 voters = set()
 
-"""
-COMMAND METHODS
-"""
+################
+#COMMAND METHODS
+################
+
 def roll_dice(diceSpec):
+    """
+    Rolls the dice based on the parameter.
+    
+    The format of the parameter is: <n>d<k>[<op><x>]
+    
+    <n> = number of dice
+    <k> = size of dice
+    <op> = operation carried out in the dice roll
+    <x> = parameter for the operation
+    
+    The valid operations for <op> are:
+        '+'|'-' = adds/substract <x> to the sum of all dice rolled
+        '*'|'/' = multiplies/divides the sum of all dice rolled by <x>
+        '>' = counts the number of dice rolled with a result of <x> or greater
+        '<' = counts the number of dice rolled with a result of <x> or less
+    """
     m = dice_re.match(diceSpec)
     reply = ""
     if m:
@@ -76,10 +97,20 @@ def roll_dice(diceSpec):
     return reply
 
 def bop(source, target):
+    """
+    Silly method to harass others, maybe.
+    
+    Inspired by the classic IRC /slap, but with more randomness:
+        * Randomly selected "tool", including the large trout from /slap
+        * Randomly chooses an Armor Class and to-hit mod, D&D style
+        * Hits, misses, crit hits and crit misses
+        * Randomly assigns some kind of damage based on hit roll.
+
+    """
     ac_mod = [-2, -1, 0, 1, 2]
     things = ["large trout", "baseball bat", "wet noodle", "body pillow"]
-    source_mod = ac_mod[sum(bytearray(source, 'utf8')) % 5] + random.choice(ac_mod)
-    target_ac = 10 + ac_mod[sum(bytearray(target, 'utf8')) % 5] + random.choice(ac_mod)
+    source_mod = random.choice(ac_mod)
+    target_ac = 10 + random.choice(ac_mod)
     mod_text = ("" if source_mod == 0 else str(source_mod) + " " 
                    if source_mod < 0 else "+" + str(source_mod) + " ")
     target_name = "themselves" if source.lower() == target.lower() else target
@@ -108,11 +139,27 @@ def bop(source, target):
     return "{0} {1}".format(action_text, result_text)
 
 def start_vote(choices):
+    """
+    Initiates a vote over a number of choices.
+    
+    Parameter 'choices' is a list, its first element is the duration of
+    the vote, the remainder are the vote options.
+    
+    Users vote by typing "!<n>", where <n> is a valid voting number.
+    
+    For example, if the mod chooses a vote for the options "Yes", "No", 
+    and "Maybe", users would send a message of "!1" to vote for "Yes", 
+    "!2" to vote for "No", and "!3" for "Maybe".
+    
+    """
     if len(choices) < 3:
         return "You need more options to call for a vote!"
     global vote_end
     global vote_choices
     global vote_counts
+    
+    if vote_end == -1:
+        return "Vote already in progress! Please wait until the current vote ends."
     
     duration = float(choices[0])
     vote_choices = choices[1:]
@@ -130,6 +177,16 @@ def start_vote(choices):
     return vote_text    
     
 def process_vote(vote, voter):
+    """
+    Processes individual votes.
+    
+    If a vote is outside of the range of possible vote numbers, 
+    or is not a number, the vote is not counted.
+    
+    Votes are individual, which means a user cannot vote twice.
+    If the user tries to vote again, the second vote is ignored.
+    
+    """
     v_num = 0
     try:
         v_num = int(vote) - 1
@@ -143,7 +200,12 @@ def process_vote(vote, voter):
         voters.add(voter)
 
 def end_vote():
-    #msg_q.put(reply)
+    """
+    Method called when the voting period ends.
+    
+    Resets all variables related to voting.
+    
+    """
     global vote_end
     global voters
     global vote_choices
@@ -163,21 +225,38 @@ def end_vote():
     vote_counts.clear()
 
 def managed_timed_events():
+    """
+    Keeps track of all timed events.
+    
+    So far, it only manages voting, but could be used for other things.
+    
+    It is used to trigger all ending methods.
+    
+    """
     global vote_end
     c_time = time.time()
     if vote_end != -1 and c_time >= vote_end:
         end_vote()
 
-"""
-CHAT CONNECTION & INTERACTION METHODS
-"""
+###########################################
+# CHAT CONNECTION & INTERACTION METHODS
+###########################################
+        
 def is_privileged(badges):
+    """
+    Returns if a user has mod privileges, based on their badges.
+    """
     return ('broadcaster' in badges 
             or 'mod' in badges 
             or 'admin' in badges 
             or 'staff' in badges)
 
-def on_message(event):
+def on_command(event):
+    """
+    Processes a command. All commands start with "!".
+    
+    Does various other things, depending on the command.
+    """
     uname = event.tags['display-name']
     # Will be used for some commands.
     privileged = is_privileged(event.tags['badges'])
@@ -206,20 +285,29 @@ def on_message(event):
             reply = start_vote(parm_cmd)
     elif main_cmd == "about":
         reply = ("I am AnatoleBot! For info + source code + commands " 
-                 + "+ updates, check https://github.com/AngelFGC/fko-waifubot")
+                 + "+ updates, check https://github.com/AngelFGC/anatolebot")
     else:
-        # TODO: manage votes
+        # Processes votes, only if voting is active
         global vote_end
         if vote_end != -1:
             voter = event.tags['display-name']
             process_vote(main_cmd, voter)
             return
-        reply = "Unknown command: {0}".format(main_cmd)
+        else:
+            reply = "Unknown command: {0}".format(main_cmd)
     
     if reply is not None:
         msg_q.put(reply)
 
 def setup_observer(o):
+    """
+    Initialization method.
+    
+    Sets up various variables & handlers to ensure the chatbot:
+        * is not softbanned for sending too many messages per second
+        * captures messages that start with "!" as Commands
+        * can be shutdown by bot creator or a user with at least mod privileges
+    """
     global timeout
     timeout = 30/100 if isMod else 30/20
     
@@ -238,9 +326,15 @@ def setup_observer(o):
                 running = False
                 print("\tBot Stopped.")
         elif e.message.startswith("!"):
-            on_message(e)
+            on_command(e)
 
 def run_bot(username, token, channel):
+    """
+    Main loop. 
+    
+    Connects to the Twitch servers with the username/token, 
+    and joins the channel provided.
+    """
     print("Bot Starting...")
     global timeout
     global running
@@ -255,6 +349,7 @@ def run_bot(username, token, channel):
                     m = msg_q.get()
                     o.send_message(m, channel)
                     time.sleep(timeout)
+                # Should this go in a different thread?
                 managed_timed_events()
                     
         except KeyboardInterrupt:
@@ -262,10 +357,21 @@ def run_bot(username, token, channel):
             o.leave_channel(channel)
             print("\tBot Stopped.")
             sys.exit(1)
-"""
-MAIN METHOD
-"""
+
+#####################
+# MAIN METHOD
+#####################
 def main():
+    """
+    Main method. Captures parameters, calls the Bot's main loop.
+    
+    Usage:
+        python anatole_bot.py <username> <oaut_token> <channel> <is_bot_mod>
+        
+        <username> and <oauth_token> are the bot's login information
+        <channel> is the channel the bot will be in
+        <is_bot_mod> should be True if the bot has mod-level privileges in <channel>
+    """
     print("Startup?")
     if len(sys.argv) < 4:
         print("Usage: python anatole_bot.py <username> <oauth_token> <channel> <is_bot_mod>")
