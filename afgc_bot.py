@@ -284,8 +284,8 @@ def on_command(event):
         else:
             reply = start_vote(parm_cmd)
     elif main_cmd == "about":
-        reply = ("I am AnatoleBot! For info + source code + commands " 
-                 + "+ updates, check https://github.com/AngelFGC/anatolebot")
+        reply = ("I am afgcBot! For info + source code + commands " 
+                 + "+ updates, check https://github.com/AngelFGC/afgctwitchbot")
     else:
         # Processes votes, only if voting is active
         global vote_end
@@ -320,7 +320,7 @@ def setup_observer(o):
         # Only available to users with moderation privileges.
         if e.message == "!goodbye":
             if (is_privileged(e.tags['badges']) or 
-                e.tags['display-name'] == "AnatoleSerial"):
+                e.tags['display-name'] == "AFGCbot"):
                 o.send_message('Goodbye!', e.channel)
                 o.leave_channel(e.channel)
                 running = False
@@ -366,7 +366,7 @@ def main():
     Main method. Captures parameters, calls the Bot's main loop.
     
     Usage:
-        python anatole_bot.py <username> <oaut_token> <channel> <is_bot_mod>
+        python afgc_bot.py <username> <oaut_token> <channel> <is_bot_mod>
         
         <username> and <oauth_token> are the bot's login information
         <channel> is the channel the bot will be in
@@ -374,7 +374,7 @@ def main():
     """
     print("Startup?")
     if len(sys.argv) < 4:
-        print("Usage: python anatole_bot.py <username> <oauth_token> <channel> <is_bot_mod>")
+        print("Usage: python afgc_bot.py <username> <oauth_token> <channel> <is_bot_mod>")
         sys.exit(1)
     global isMod
     username  = sys.argv[1]
